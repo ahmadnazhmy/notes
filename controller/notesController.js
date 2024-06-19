@@ -46,58 +46,68 @@ const addNotes = async (req, res) => {
 };
 
 const updateNotes = async (req, res) => {
-    const { title, note } = req.body
     const { id } = req.params;
+    const { title, datetime, note } = req.body;
     
     try {
-      const updatedFields = {};
-      
-      if (title !== undefined) {
-        updatedFields.title = title;
-      }
-      
-      if (note !== undefined) {
-        updatedFields.note = note;
-      }
-      
-      if (Object.keys(updatedFields).length === 0) {
-        return res.status(200).json({
-          message: "Tidak ada perubahan yang dilakukan pada catatan",
-          data: { id: id }
+        const existingNote = await query("SELECT * FROM notes WHERE id = ?", [id]);
+        
+        if (existingNote.length === 0) {
+            return res.status(404).json({
+                message: "Catatan tidak ditemukan"
+            });
+        }
+        
+        const updatedFields = {};
+        if (title !== undefined && title !== existingNote[0].title) {
+            updatedFields.title = title;
+        }
+        if (datetime !== undefined && datetime !== existingNote[0].datetime) {
+            updatedFields.datetime = datetime;
+        }
+        if (note !== undefined && note !== existingNote[0].note) {
+            updatedFields.note = note;
+        }
+        
+        if (Object.keys(updatedFields).length === 0) {
+            return res.status(200).json({
+                message: "Tidak ada perubahan yang dilakukan pada catatan",
+                data: existingNote[0]  
+            });
+        }
+
+        const queryValues = [];
+        let updateQuery = "UPDATE notes SET";
+        
+
+        Object.keys(updatedFields).forEach((key, index) => {
+            updateQuery += ` ${key} = ?`;
+            queryValues.push(updatedFields[key]);
+            if (index < Object.keys(updatedFields).length - 1) {
+                updateQuery += ",";
+            }
         });
-      }
-      
-      let updateQuery = "UPDATE notes SET";
-      const queryValues = [];
-      
-      Object.keys(updatedFields).forEach((key, index) => {
-        updateQuery += ` ${key} = ?`;
-        queryValues.push(updatedFields[key]);
-        if (index < Object.keys(updatedFields).length - 1) {
-          updateQuery += ",";
-        }
-      });
-      
-      updateQuery += " WHERE id = ?";
-      queryValues.push(id);
-      
-      await query(updateQuery, queryValues);
-      
-      return res.status(200).json({
-        message: "Catatan berhasil diperbarui",
-        data: {
-          id: id,
-          ...updatedFields
-        }
-      });
+        
+        updateQuery += " WHERE id = ?";
+        queryValues.push(id);
+    
+        await query(updateQuery, queryValues);
+        
+        const updatedNote = await query("SELECT * FROM notes WHERE id = ?", [id]);
+     
+        return res.status(200).json({
+            message: "Catatan berhasil diperbarui",
+            data: updatedNote[0]  
+        });
     } catch (error) {
-      console.error("Gagal memperbarui catatan:", error);
-      return res.status(500).json({
-        message: "Gagal memperbarui catatan",
-        error: error.message
-      });
+        console.error("Gagal memperbarui catatan:", error);
+        return res.status(500).json({
+            message: "Gagal memperbarui catatan",
+            error: error.message
+        });
     }
-  };
+};
+
   
 
 const deleteNotes = async (req, res) => {
